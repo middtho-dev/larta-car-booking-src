@@ -1,6 +1,8 @@
 let currentDate = new Date();
 let bookings = [];
 let availableCars = [];
+let searchQuery = '';
+let selectedStatus = 'all';
 
 const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const months = [
@@ -9,11 +11,79 @@ const months = [
 ];
 
 
+function formatForDateTimeLocal(date) {
+    const pad = num => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getFilteredBookings() {
+    const normalized = searchQuery.trim().toLowerCase();
+    return bookings.filter((booking) => {
+        const statusMatch = selectedStatus === 'all' || booking.status === selectedStatus;
+        if (!statusMatch) {
+            return false;
+        }
+
+        if (!normalized) {
+            return true;
+        }
+
+        const searchable = [booking.model, booking.number_plate, booking.full_name]
+            .map((item) => String(item || '').toLowerCase())
+            .join(' ');
+
+        return searchable.includes(normalized);
+    });
+}
+
+
+
+
+function initTelegramWebApp() {
+    if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+        document.body.classList.add('telegram-miniapp');
+    }
+}
+
+function requireAuthToken() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/';
+        return null;
+    }
+    return token;
+}
+
+function notify(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 250);
+    }, 2600);
+}
+
 async function loadBookings() {
     try {
         const response = await fetch('/api/bookings/calendar', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -37,7 +107,7 @@ async function loadAvailableCars() {
     try {
         const response = await fetch('/api/cars/available', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -74,13 +144,13 @@ function showCreateBookingModal(date) {
 
     const startDate = new Date(date);
     startDate.setHours(9, 0, 0);
-    startDateTime.value = startDate.toISOString().slice(0, 16);
+    startDateTime.value = formatForDateTimeLocal(startDate);
     
 
     const endDate = new Date(date);
     endDate.setDate(endDate.getDate() + 1);
     endDate.setHours(9, 0, 0);
-    endDateTime.value = endDate.toISOString().slice(0, 16);
+    endDateTime.value = formatForDateTimeLocal(endDate);
     
 
     loadAvailableCars();
@@ -102,7 +172,7 @@ async function createBooking(event) {
     const endTime = document.getElementById('endDateTime').value;
     
     if (!carId || !startTime || !endTime) {
-        alert('Пожалуйста, заполните все поля');
+        notify('Пожалуйста, заполните все поля', 'warning');
         return;
     }
     
@@ -111,7 +181,7 @@ async function createBooking(event) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             },
             body: JSON.stringify({
                 car_id: parseInt(carId),
@@ -126,12 +196,13 @@ async function createBooking(event) {
             throw new Error(result.detail || 'Ошибка при создании бронирования');
         }
         
-        alert('Бронирование успешно создано');
+        notify('Бронирование успешно создано', 'success');
         closeCreateBookingModal();
-        loadBookings(); 
+        initTelegramWebApp();
+    loadBookings(); 
         
     } catch (error) {
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -172,6 +243,8 @@ function renderCalendar() {
     for (let day = 1; day <= daysInMonth; day++) {
         const calendarDay = document.createElement('div');
         calendarDay.className = 'calendar-day';
+        calendarDay.style.animationDelay = `${Math.min(day * 0.01, 0.25)}s`;
+
         
         const dateDiv = document.createElement('div');
         dateDiv.className = 'date';
@@ -188,7 +261,7 @@ function renderCalendar() {
         bookingsContainer.className = 'bookings-container';
         
     
-        const dayBookings = bookings.filter(booking => {
+        const dayBookings = getFilteredBookings().filter(booking => {
             const bookingDate = new Date(booking.start_time);
             return bookingDate.getDate() === day && 
                    bookingDate.getMonth() === month && 
@@ -249,14 +322,14 @@ function showBookingDetails(booking) {
    
     bookingInfo.innerHTML = `
         <h2>Информация о бронировании</h2>
-        <p><strong>Автомобиль:</strong> ${booking.model} (${booking.number_plate})</p>
-        <p><strong>Клиент:</strong> ${booking.full_name}</p>
-        <p><strong>ФИО:</strong> ${booking.description || 'Не указано'}</p>
-        <p><strong>Телефон:</strong> ${booking.phone_number || 'Не указан'}</p>
-        <p><strong>Телеграм:</strong> ${booking.telegram_id}</p>
-        <p><strong>Начало:</strong> ${startDate}</p>
-        <p><strong>Окончание:</strong> ${endDate}</p>
-        <p><strong>Статус:</strong> <span class="status-badge ${statusClass}">${statusText}</span></p>
+        <p><strong>Автомобиль:</strong> ${escapeHtml(booking.model)} (${escapeHtml(booking.number_plate)})</p>
+        <p><strong>Клиент:</strong> ${escapeHtml(booking.full_name)}</p>
+        <p><strong>ФИО:</strong> ${escapeHtml(booking.description || 'Не указано')}</p>
+        <p><strong>Телефон:</strong> ${escapeHtml(booking.phone_number || 'Не указан')}</p>
+        <p><strong>Телеграм:</strong> ${escapeHtml(booking.telegram_id)}</p>
+        <p><strong>Начало:</strong> ${escapeHtml(startDate)}</p>
+        <p><strong>Окончание:</strong> ${escapeHtml(endDate)}</p>
+        <p><strong>Статус:</strong> <span class="status-badge ${statusClass}">${escapeHtml(statusText)}</span></p>
     `;
     
    
@@ -264,7 +337,10 @@ function showBookingDetails(booking) {
     afterPhotos.innerHTML = '';
     
     
-    booking.photos.before.forEach(photo => {
+    const before = booking.photos?.before || [];
+    const after = booking.photos?.after || [];
+
+    before.forEach(photo => {
         const img = document.createElement('img');
         img.src = photo;
         img.className = 'photo-thumbnail';
@@ -273,7 +349,7 @@ function showBookingDetails(booking) {
     });
     
     
-    booking.photos.after.forEach(photo => {
+    after.forEach(photo => {
         const img = document.createElement('img');
         img.src = photo;
         img.className = 'photo-thumbnail';
@@ -332,6 +408,20 @@ document.getElementById('nextMonth').onclick = () => {
     renderCalendar();
 };
 
+document.getElementById('goToTodayBtn').onclick = () => {
+    currentDate = new Date();
+    renderCalendar();
+};
+
+document.getElementById('quickCreateBtn').onclick = () => {
+    showCreateBookingModal(new Date());
+};
+
+const fabCreate = document.getElementById('mobileFabCreate');
+if (fabCreate) {
+    fabCreate.onclick = () => showCreateBookingModal(new Date());
+}
+
 
 document.querySelector('.close').onclick = () => {
     document.getElementById('bookingModal').style.display = 'none';
@@ -343,7 +433,7 @@ async function logout() {
         const response = await fetch('/logout', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -356,7 +446,7 @@ async function logout() {
         
     } catch (error) {
         console.error('Ошибка:', error);
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -364,7 +454,7 @@ async function checkAdminRights() {
     try {
         const response = await fetch('/auth/me', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -404,7 +494,7 @@ async function addCar(event) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             },
             body: JSON.stringify({ model, number_plate })
         });
@@ -415,13 +505,13 @@ async function addCar(event) {
             throw new Error(result.detail || 'Ошибка при добавлении автомобиля');
         }
         
-        alert('Автомобиль успешно добавлен');
+        notify('Автомобиль успешно добавлен', 'success');
         closeAddCarModal();
         loadBookings(); 
         
     } catch (error) {
         console.error('Ошибка:', error);
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -441,7 +531,7 @@ async function loadActiveBookings() {
     try {
         const response = await fetch('/api/bookings/calendar', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -508,7 +598,7 @@ async function loadActiveBookings() {
         
     } catch (error) {
         console.error('Ошибка:', error);
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -543,8 +633,8 @@ function addBookingItem(booking, container) {
     bookingItem.className = 'booking-item';
     bookingItem.innerHTML = `
         <div class="booking-info">
-            <p><strong>Клиент:</strong> ${booking.full_name}</p>
-            <p><strong>Автомобиль:</strong> ${booking.model} (${booking.number_plate})</p>
+            <p><strong>Клиент:</strong> ${escapeHtml(booking.full_name)}</p>
+            <p><strong>Автомобиль:</strong> ${escapeHtml(booking.model)} (${escapeHtml(booking.number_plate)})</p>
             <p><strong>Период:</strong> ${startDate} - ${endDate}</p>
             <p><strong>Статус:</strong> <span class="status-badge ${statusClass}">${statusText}</span></p>
         </div>
@@ -565,7 +655,7 @@ async function updateBookingStatus(bookingId, newStatus) {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             },
             body: JSON.stringify({ status: newStatus })
         });
@@ -580,11 +670,11 @@ async function updateBookingStatus(bookingId, newStatus) {
         loadBookings();
         
         const statusText = newStatus === 'completed' ? 'завершено' : 'отменено';
-        alert(`Бронирование успешно ${statusText}`);
+        notify(`Бронирование успешно ${statusText}`, 'success');
         
     } catch (error) {
         console.error('Ошибка:', error);
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -602,7 +692,7 @@ async function getCurrentUser() {
     try {
         const response = await fetch('/auth/me', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -633,7 +723,7 @@ async function cancelUserBooking(bookingId) {
         const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
             method: 'DELETE',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -643,18 +733,41 @@ async function cancelUserBooking(bookingId) {
         }
         
         const data = await response.json();
-        alert('Бронирование успешно отменено');
+        notify('Бронирование успешно отменено', 'success');
         document.getElementById('bookingModal').style.display = 'none';
         refreshCalendar();
     } catch (error) {
-        alert(`Ошибка: ${error.message}`);
+        notify(`Ошибка: ${error.message}`, 'error');
     }
 }
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (!requireAuthToken()) {
+        return;
+    }
+
     loadBookings();
     checkAdminRights();
+
+    const searchInput = document.getElementById('bookingSearch');
+    const statusFilter = document.getElementById('statusFilter');
+    const openWebAppBtn = document.getElementById('openWebAppBtn');
+
+    if (openWebAppBtn) {
+        openWebAppBtn.href = `${window.location.origin}/dashboard`;
+    }
+
+    searchInput.addEventListener('input', (event) => {
+        searchQuery = event.target.value;
+        renderCalendar();
+    });
+
+    statusFilter.addEventListener('change', (event) => {
+        selectedStatus = event.target.value;
+        renderCalendar();
+    });
+
     document.getElementById('createBookingForm').addEventListener('submit', createBooking);
     document.getElementById('logoutBtn').addEventListener('click', logout);
     document.getElementById('addCarBtn').addEventListener('click', showAddCarModal);
