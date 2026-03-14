@@ -4,48 +4,78 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/static/css/auth.css" />
-  <title>Авторизация по токену</title>
+  <title>Авторизация</title>
 </head>
 <body>
   <div class="auth-container">
     <h2>🔐 Авторизация</h2>
+
+    <a id="botLoginBtn" class="bot-login-btn" href="{{ bot_url }}" target="_blank" rel="noopener noreferrer">
+      Авторизация через бота
+    </a>
+
+    <div class="divider"><span>или</span></div>
+
     <form id="authForm">
       <label for="token">Введите токен</label>
       <input type="text" id="token" name="token" placeholder="Ваш токен доступа" required />
       <button type="submit">Войти</button>
     </form>
-    <p>Получить токен можно у бота, в разделе <strong>🗓️ Календарь</strong></p>
-    <p id="errorMessage" style="color: #ff4444; display: none;"></p>
+
+    <p>Если переходите из Telegram, вход произойдет автоматически.</p>
+    <p id="errorMessage" style="color: #ff6b6b; display: none;"></p>
   </div>
 
   <script>
+    const errorMessage = document.getElementById('errorMessage');
+
+    async function verifyAndLogin(token) {
+      const formData = new FormData();
+      formData.append('token', token);
+
+      const response = await fetch('/verify-token', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || 'Ошибка авторизации');
+      }
+
+      localStorage.setItem('token', token);
+      window.location.href = '/dashboard';
+    }
+
+    async function autoLoginFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('token');
+
+      if (!urlToken) {
+        return;
+      }
+
+      try {
+        await verifyAndLogin(urlToken.trim());
+      } catch (error) {
+        errorMessage.textContent = `Автовход не выполнен: ${error.message}`;
+        errorMessage.style.display = 'block';
+      }
+    }
+
     document.getElementById('authForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const token = document.getElementById('token').value;
-      const errorMessage = document.getElementById('errorMessage');
-      
+
       try {
-        const formData = new FormData();
-        formData.append('token', token);
-        
-        const response = await fetch('/verify-token', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (response.ok) {
-          localStorage.setItem('token', token);
-          window.location.href = '/dashboard';
-        } else {
-          const data = await response.json();
-          errorMessage.textContent = data.detail || 'Ошибка авторизации';
-          errorMessage.style.display = 'block';
-        }
+        await verifyAndLogin(token.trim());
       } catch (error) {
-        errorMessage.textContent = 'Ошибка сервера';
+        errorMessage.textContent = error.message;
         errorMessage.style.display = 'block';
       }
     });
+
+    autoLoginFromQuery();
   </script>
 </body>
 </html>
