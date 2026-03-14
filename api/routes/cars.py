@@ -107,10 +107,16 @@ async def get_all_cars(user: Dict = Depends(verify_token)) -> List[Dict]:
 
 @router.put("/cars/{number_plate}/status")
 async def update_car_status(
-    number_plate: str, status: CarStatus, _: Dict = Depends(verify_token)
+    number_plate: str, status: CarStatus, user: Dict = Depends(verify_token)
 ) -> Dict:
-    """Обновление статуса автомобиля"""
+    """Обновление статуса автомобиля (только для админов)"""
     try:
+        if not user.get('admin'):
+            raise HTTPException(
+                status_code=403,
+                detail="Недостаточно прав для выполнения операции"
+            )
+
         car = await db.get_car_by_number(number_plate)
         if not car:
             raise HTTPException(status_code=404, detail="Car not found")
