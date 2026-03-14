@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/static/css/auth.css" />
   <title>Авторизация</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
   <div class="auth-container">
@@ -47,6 +48,20 @@
       window.location.href = '/dashboard';
     }
 
+
+    async function loginFromStoredToken() {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return;
+      }
+
+      try {
+        await verifyAndLogin(token);
+      } catch (_) {
+        localStorage.removeItem('token');
+      }
+    }
+
     async function autoLoginFromQuery() {
       const params = new URLSearchParams(window.location.search);
       const urlToken = params.get('token');
@@ -75,7 +90,12 @@
       }
     });
 
-    autoLoginFromQuery();
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+
+    loginFromStoredToken().then(autoLoginFromQuery);
   </script>
 </body>
 </html>

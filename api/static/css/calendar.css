@@ -1043,3 +1043,15 @@ body {
     justify-content: center;
   }
 }
+
+
+body.telegram-miniapp {
+  padding: 0;
+}
+
+body.telegram-miniapp .calendar-container {
+  max-width: 100%;
+  min-height: 100vh;
+  border-radius: 0;
+  margin: 0;
+}

@@ -47,6 +47,15 @@ function getFilteredBookings() {
 
 
 
+
+function initTelegramWebApp() {
+    if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+        document.body.classList.add('telegram-miniapp');
+    }
+}
+
 function requireAuthToken() {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -189,7 +198,8 @@ async function createBooking(event) {
         
         notify('Бронирование успешно создано', 'success');
         closeCreateBookingModal();
-        loadBookings(); 
+        initTelegramWebApp();
+    loadBookings(); 
         
     } catch (error) {
         notify(error.message, 'error');
