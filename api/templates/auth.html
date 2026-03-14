@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/static/css/auth.css" />
+  <title>Авторизация по токену</title>
+</head>
+<body>
+  <div class="auth-container">
+    <h2>🔐 Авторизация</h2>
+    <form id="authForm">
+      <label for="token">Введите токен</label>
+      <input type="text" id="token" name="token" placeholder="Ваш токен доступа" required />
+      <button type="submit">Войти</button>
+    </form>
+    <p>Получить токен можно у бота, в разделе <strong>🗓️ Календарь</strong></p>
+    <p id="errorMessage" style="color: #ff4444; display: none;"></p>
+  </div>
+
+  <script>
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const token = document.getElementById('token').value;
+      const errorMessage = document.getElementById('errorMessage');
+      
+      try {
+        const formData = new FormData();
+        formData.append('token', token);
+        
+        const response = await fetch('/verify-token', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (response.ok) {
+          localStorage.setItem('token', token);
+          window.location.href = '/dashboard';
+        } else {
+          const data = await response.json();
+          errorMessage.textContent = data.detail || 'Ошибка авторизации';
+          errorMessage.style.display = 'block';
+        }
+      } catch (error) {
+        errorMessage.textContent = 'Ошибка сервера';
+        errorMessage.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Календарь бронирований</title>
+  <link rel="stylesheet" href="/static/css/calendar.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/css/lightbox.min.css">
+</head>
+<body>
+  <div class="calendar-container glass">
+    <div class="calendar-header">
+      <button id="prevMonth">&lt; Предыдущий</button>
+      <h1 id="currentMonth"></h1>
+      <button id="nextMonth">Следующий &gt;</button>
+    </div>
+    <div class="user-controls">
+      <div class="admin-controls" style="display: none;">
+        <button id="addCarBtn" class="btn-primary">Добавить автомобиль</button>
+        <button id="reportBtn" class="btn-primary">Отчет</button>
+        <button id="cancelBookingBtn" class="btn-secondary" data-modal="manageBookingsModal" onclick="document.getElementById('manageBookingsModal').style.display = 'block';">Отменить бронь</button>
+      </div>
+      <button id="logoutBtn" class="btn-secondary">Выйти</button>
+    </div>
+    <div id="calendar" class="calendar">
+    </div>
+  </div>
+
+  <div id="bookingModal" class="modal">
+    <div class="modal-content glass">
+      <span class="close">&times;</span>
+      <div id="bookingInfo"></div>
+      
+      <div class="photos-container">
+        <div class="photos-section">
+          <h3>Фото до начала</h3>
+          <div id="beforePhotos" class="photos-grid"></div>
+        </div>
+        
+        <div class="photos-section">
+          <h3>Фото после окончания</h3>
+          <div id="afterPhotos" class="photos-grid"></div>
+        </div>
+      </div>
+      
+      <div id="bookingActions" class="booking-actions" style="margin-top: 20px; text-align: right;">
+      </div>
+    </div>
+  </div>
+
+  <div id="createBookingModal" class="modal">
+    <div class="modal-content glass">
+      <span class="close" onclick="closeCreateBookingModal()">&times;</span>
+      <h2>Создание бронирования</h2>
+      <form id="createBookingForm" class="booking-form">
+        <div class="form-group">
+          <label for="carSelect">Автомобиль:</label>
+          <select id="carSelect" required>
+            <option value="">Выберите автомобиль</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="startDateTime">Начало бронирования:</label>
+          <input type="datetime-local" id="startDateTime" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="endDateTime">Окончание бронирования:</label>
+          <input type="datetime-local" id="endDateTime" required>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Создать бронирование</button>
+          <button type="button" class="btn-secondary" onclick="closeCreateBookingModal()">Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="addCarModal" class="modal">
+    <div class="modal-content glass">
+      <span class="close" onclick="closeAddCarModal()">&times;</span>
+      <h2>Добавление автомобиля</h2>
+      <form id="addCarForm" class="booking-form">
+        <div class="form-group">
+          <label for="carModel">Модель автомобиля:</label>
+          <input type="text" id="carModel" required placeholder="Например: Toyota Camry">
+        </div>
+        
+        <div class="form-group">
+          <label for="carNumber">Гос. номер:</label>
+          <input type="text" id="carNumber" required placeholder="Например: A123BC">
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Добавить</button>
+          <button type="button" class="btn-secondary" onclick="closeAddCarModal()">Отмена</button>
+        </div>
+      </form>
+      
+      <div class="cars-list-section">
+        <h3>Доступные автомобили</h3>
+        <div id="carsList" class="cars-list">
+          <div style="text-align: center; padding: 20px;">
+            <div class="loading-spinner"></div>
+            <p>Загрузка автомобилей...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="manageBookingsModal" class="modal">
+    <div class="modal-content glass">
+      <span class="close" onclick="document.getElementById('manageBookingsModal').style.display = 'none';">&times;</span>
+      <h2>Управление бронированиями</h2>
+      <div id="activeBookingsList" class="bookings-list">
+      </div>
+    </div>
+  </div>
+
+  <div id="reportModal" class="modal">
+    <div class="modal-content glass">
+      <span class="close" onclick="document.getElementById('reportModal').style.display = 'none';">&times;</span>
+      <h2>Отчет о бронированиях</h2>
+      <div class="report-header">
+        <div class="month-navigation">
+          <button id="prevReportMonth" class="btn-secondary">&lt; Предыдущий</button>
+          <h3 id="reportMonth"></h3>
+          <button id="nextReportMonth" class="btn-secondary">Следующий &gt;</button>
+        </div>
+        <button id="downloadExcelBtn" class="btn-primary">Скачать Excel</button>
+      </div>
+      <div id="reportContent">
+      </div>
+    </div>
+  </div>
+
+  <div id="editCarModal" class="modal">
+    <div class="modal-content glass">
+      <span class="close" onclick="closeEditCarModal()">&times;</span>
+      <h2>Редактирование автомобиля</h2>
+      <form id="editCarForm" class="booking-form">
+        <input type="hidden" id="editCarId">
+        <div class="form-group">
+          <label for="editCarModel">Модель автомобиля:</label>
+          <input type="text" id="editCarModel" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="editCarNumber">Гос. номер:</label>
+          <input type="text" id="editCarNumber" required>
+        </div>
+
+        <div class="form-group">
+          <label for="editCarStatus">Статус:</label>
+          <select id="editCarStatus" required>
+            <option value="available">Доступен</option>
+            <option value="unavailable">Недоступен</option>
+            <option value="booked">Забронирован</option>
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Сохранить</button>
+          <button type="button" class="btn-secondary" onclick="closeEditCarModal()">Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/js/lightbox.min.js"></script>
+  <script src="/static/js/calendar.js"></script>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const cancelBtn = document.getElementById('cancelBookingBtn');
+      
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+          const modal = document.getElementById('manageBookingsModal');
+          const bookingsList = document.getElementById('activeBookingsList');
+          
+          bookingsList.innerHTML = `
+              <div style="text-align: center; padding: 30px;">
+                  <div class="loading-spinner"></div>
+                  <p>Загрузка активных бронирований...</p>
+              </div>
+          `;
+          
+          fetch('/api/bookings/calendar', {
+              headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! Status: ${response.status}`);
+              }
+              return response.json();
+          })
+          .then(data => {
+              console.log('Полученные данные:', data);
+              
+              const activeBookings = data.filter(booking => booking.status === 'active');
+              
+              if (activeBookings.length === 0) {
+                  bookingsList.innerHTML = `
+                      <div style="text-align: center; padding: 30px;">
+                          <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <line x1="12" y1="8" x2="12" y2="12"></line>
+                              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                          </svg>
+                          <p>Нет активных бронирований</p>
+                      </div>
+                  `;
+                  return;
+              }
+              
+              bookingsList.innerHTML = '';
+              
+              activeBookings.forEach(booking => {
+                  console.log('Данные бронирования:', booking);
+                  const startDate = new Date(booking.start_time).toLocaleString('ru-RU');
+                  const endDate = new Date(booking.end_time).toLocaleString('ru-RU');
+                  
+                  const bookingItem = document.createElement('div');
+                  bookingItem.className = 'booking-item';
+                  bookingItem.innerHTML = `
+                      <div class="booking-title">Бронирование #${booking.id}</div>
+                      <div class="booking-details">
+                          <div class="detail-row"><span class="label">🚗 Автомобиль: </span><span>${booking.car_model || booking.model || 'Не указан'} ${booking.number_plate ? `(${booking.number_plate})` : ''}</span></div>
+                          <div class="detail-row"><span class="label">🧑‍💻 Имя пользователя: </span><span>${booking.client_name || booking.full_name || booking.username || 'Не указан'}</span></div>
+                          <div class="detail-row"><span class="label">🆔 Telegram ID: </span><span>${booking.telegram_id || booking.telegram_id || 'Не указан'}</span></div>
+                          <div class="detail-row"><span class="label">👤 ФИО: </span><span>${booking.description || booking.description || 'Не указан'}</span></div>
+                          <div class="detail-row"><span class="label">📞 Телефон: </span><span>${booking.client_phone || booking.phone_number || 'Не указан'}</span></div>
+                          <div class="detail-row"><span class="label">🕒 Начало: </span><span>${startDate}</span></div>
+                          <div class="detail-row"><span class="label">🕓 Окончание: </span><span>${endDate}</span></div>
+                          
+                      </div>
+                      <div class="booking-actions">
+                          <button class="btn-complete" onclick="updateBookingStatus(${booking.id}, 'completed')">✓ Завершить</button>
+                          <button class="btn-cancel" onclick="updateBookingStatus(${booking.id}, 'canceled')">✕ Отменить</button>
+                      </div>
+                  `;
+                  
+                  bookingsList.appendChild(bookingItem);
+              });
+          })
+          .catch(error => {
+              bookingsList.innerHTML = `
+                  <div style="text-align: center; padding: 30px;">
+                      <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="rgba(255,0,0,0.7)" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <line x1="12" y1="8" x2="12" y2="12"></line>
+                          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      <p>Ошибка загрузки данных: ${error.message}</p>
+                  </div>
+              `;
+          });
+        });
+      }
+    });
+    
+    function updateBookingStatus(bookingId, newStatus) {
+        fetch(`/api/bookings/${bookingId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.detail || `HTTP error! Status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert(`Статус бронирования успешно изменен на "${newStatus}"`);
+            document.getElementById('cancelBookingBtn').click();
+        })
+        .catch(error => {
+            alert(`Ошибка: ${error.message}`);
+        });
+    }
+
+    function cancelUserBooking(bookingId) {
+      if (confirm('Вы уверены, что хотите отменить бронирование?')) {
+        fetch(`/api/bookings/${bookingId}/cancel`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(data => {
+              throw new Error(data.detail || `HTTP error! Status: ${response.status}`);
+            });
+          }
+          return response.json();
+        })
+        .then(data => {
+          alert('Бронирование успешно отменено');
+          document.getElementById('bookingModal').style.display = 'none';
+          refreshCalendar();
+        })
+        .catch(error => {
+          alert(`Ошибка: ${error.message}`);
+        });
+      }
+    }
+  </script>
+
+  <script>
+    function loadCarsList() {
+      const carsList = document.getElementById('carsList');
+      
+      carsList.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+          <div class="loading-spinner"></div>
+          <p>Загрузка автомобилей...</p>
+        </div>
+      `;
+      
+      fetch('/api/cars', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(cars => {
+        console.log('Данные автомобилей:', cars);
+        
+        if (cars.length === 0) {
+          carsList.innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+              <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <p>Нет доступных автомобилей</p>
+            </div>
+          `;
+          return;
+        }
+        
+        carsList.innerHTML = '';
+        
+        cars.forEach(car => {
+          const carItem = document.createElement('div');
+          carItem.className = 'car-item';
+          
+          let statusClass = '';
+          let statusText = '';
+          
+          switch(car.status) {
+            case 'available':
+              statusClass = 'status-available';
+              statusText = 'Свободен';
+              break;
+            case 'booked':
+              statusClass = 'status-booked';
+              statusText = 'Забронирован';
+              break;
+            case 'unavailable':
+              statusClass = 'status-unavailable';
+              statusText = 'Недоступен';
+              break;
+            default:
+              statusClass = 'status-unknown';
+              statusText = car.status || 'Неизвестно';
+          }
+          
+          carItem.innerHTML = `
+            <div class="car-details">
+              <div class="car-name">${car.model} <span class="car-plate">${car.number_plate}</span></div>
+              <div class="car-status ${statusClass}">${statusText}</div>
+            </div>
+            <div class="car-actions">
+              <button class="btn-secondary btn-small" onclick="editCar(${car.id})">✏️</button>
+              <button class="btn-cancel btn-small" onclick="deleteCar(${car.id})">🗑️</button>
+            </div>
+          `;
+          
+          carsList.appendChild(carItem);
+        });
+      })
+      .catch(error => {
+        carsList.innerHTML = `
+          <div style="text-align: center; padding: 20px;">
+            <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="rgba(255,0,0,0.7)" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p>Ошибка загрузки данных: ${error.message}</p>
+          </div>
+        `;
+      });
+    }
+    
+    function editCar(carId) {
+      fetch(`/api/cars/all`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(cars => {
+        const car = cars.find(c => c.id === carId);
+        if (!car) {
+          throw new Error('Автомобиль не найден');
+        }
+
+        document.getElementById('editCarId').value = car.id;
+        document.getElementById('editCarModel').value = car.model;
+        document.getElementById('editCarNumber').value = car.number_plate;
+        document.getElementById('editCarStatus').value = car.status;
+
+        document.getElementById('editCarModal').style.display = 'block';
+      })
+      .catch(error => {
+        alert(`Ошибка: ${error.message}`);
+      });
+    }
+    
+    function closeEditCarModal() {
+      document.getElementById('editCarModal').style.display = 'none';
+    }
+
+    document.getElementById('editCarForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const carId = document.getElementById('editCarId').value;
+      const newModel = document.getElementById('editCarModel').value;
+      const newNumber = document.getElementById('editCarNumber').value;
+      const newStatus = document.getElementById('editCarStatus').value;
+      let currentNumber = '';
+      
+      fetch(`/api/cars/all`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(cars => {
+        const car = cars.find(c => c.id === parseInt(carId));
+        if (!car) {
+          throw new Error('Автомобиль не найден');
+        }
+        currentNumber = car.number_plate;
+        
+        return fetch(`/api/cars/${carId}/model`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ model: newModel })
+        });
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(data => {
+            throw new Error(data.detail || `HTTP error! Status: ${response.status}`);
+          });
+        }
+        return response.json();
+      })
+      .then(() => {
+        return fetch(`/api/cars/${currentNumber}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(data => {
+            throw new Error(data.detail || `HTTP error! Status: ${response.status}`);
+          });
+        }
+        return response.json();
+      })
+      .then(() => {
+        return fetch(`/api/cars/${carId}/number`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ number_plate: newNumber })
+        });
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(data => {
+            throw new Error(data.detail || `HTTP error! Status: ${response.status}`);
+          });
+        }
+        return response.json();
+      })
+      .then(() => {
+        alert('Автомобиль успешно обновлен');
+        closeEditCarModal();
+        loadCarsList();
+      })
+      .catch(error => {
+        alert(`Ошибка: ${error.message}`);
+      });
+    });
+
+    function deleteCar(carId) {
+      if (confirm(`Вы уверены, что хотите отключить автомобиль ID: ${carId}?`)) {
+        fetch(`/api/cars/all`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(cars => {
+          const car = cars.find(car => car.id === carId);
+          if (!car) {
+            throw new Error('Автомобиль не найден');
+          }
+          
+          return fetch(`/api/cars/${car.number_plate}/delete`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+        })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(data => {
+              throw new Error(data.detail || `HTTP error! Status: ${response.status}`);
+            });
+          }
+          return response.json();
+        })
+        .then(data => {
+          alert('Автомобиль успешно отключен');
+          loadCarsList();
+        })
+        .catch(error => {
+          alert(`Ошибка: ${error.message}`);
+        });
+      }
+    }
+    
+    document.getElementById('addCarBtn').addEventListener('click', function() {
+      document.getElementById('addCarModal').style.display = 'block';
+      loadCarsList();
+    });
+
+    document.getElementById('reportBtn').addEventListener('click', function() {
+      loadReport();
+      document.getElementById('reportModal').style.display = 'block';
+    });
+
+    function loadReport() {
+      const reportContent = document.getElementById('reportContent');
+      const reportMonth = document.getElementById('reportMonth');
+      
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      
+      loadReportData(year, month);
+    }
+    
+    function loadReportData(year, month) {
+      const reportContent = document.getElementById('reportContent');
+      const reportMonth = document.getElementById('reportMonth');
+      
+      reportMonth.textContent = `${months[month-1]} ${year}`;
+      
+      reportMonth.dataset.year = year;
+      reportMonth.dataset.month = month;
+      
+      reportContent.innerHTML = `
+        <div style="text-align: center; padding: 30px;">
+          <div class="loading-spinner"></div>
+          <p>Загрузка отчета...</p>
+        </div>
+      `;
+      
+      fetch(`/api/reports/monthly/${year}/${month}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log('Данные отчета:', data);
+        
+        if (data.length === 0) {
+          reportContent.innerHTML = `
+            <div style="text-align: center; padding: 30px;">
+              <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <p>Нет данных о бронированиях за этот месяц</p>
+            </div>
+          `;
+          return;
+        }
+        
+        reportContent.innerHTML = `
+          <div class="table-responsive">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Клиент</th>
+                  <th>Телефон</th>
+                  <th>Автомобиль</th>
+                  <th>Номер</th>
+                  <th>Начало</th>
+                  <th>Окончание</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody id="reportTableBody">
+              </tbody>
+            </table>
+          </div>
+        `;
+        
+        const tableBody = document.getElementById('reportTableBody');
+        
+        data.forEach(booking => {
+          const startDate = new Date(booking.start_time).toLocaleString('ru-RU');
+          const endDate = new Date(booking.end_time).toLocaleString('ru-RU');
+          
+          let statusClass = '';
+          let statusText = '';
+          
+          switch(booking.booking_status) {
+            case 'active':
+              statusClass = 'status-active';
+              statusText = 'Активно';
+              break;
+            case 'completed':
+              statusClass = 'status-completed';
+              statusText = 'Завершено';
+              break;
+            case 'canceled':
+              statusClass = 'status-canceled';
+              statusText = 'Отменено';
+              break;
+            default:
+              statusClass = '';
+              statusText = booking.booking_status;
+          }
+          
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td title="${booking.user_name || 'Не указано'}">${booking.user_name || 'Не указано'}</td>
+            <td title="${booking.user_phone || 'Не указано'}">${booking.user_phone || 'Не указано'}</td>
+            <td title="${booking.car_model || 'Не указано'}">${booking.car_model || 'Не указано'}</td>
+            <td title="${booking.car_plate || 'Не указано'}">${booking.car_plate || 'Не указано'}</td>
+            <td title="${startDate}">${startDate}</td>
+            <td title="${endDate}">${endDate}</td>
+            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+          `;
+          
+          tableBody.appendChild(row);
+        });
+      })
+      .catch(error => {
+        reportContent.innerHTML = `
+          <div style="text-align: center; padding: 30px;">
+            <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="rgba(255,0,0,0.7)" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p>Ошибка загрузки данных: ${error.message}</p>
+          </div>
+        `;
+      });
+    }
+    
+    document.getElementById('prevReportMonth').addEventListener('click', function() {
+      const reportMonth = document.getElementById('reportMonth');
+      let year = parseInt(reportMonth.dataset.year);
+      let month = parseInt(reportMonth.dataset.month);
+      
+      month--;
+      if (month < 1) {
+        month = 12;
+        year--;
+      }
+      
+      loadReportData(year, month);
+    });
+    
+    document.getElementById('nextReportMonth').addEventListener('click', function() {
+      const reportMonth = document.getElementById('reportMonth');
+      let year = parseInt(reportMonth.dataset.year);
+      let month = parseInt(reportMonth.dataset.month);
+      
+      month++;
+      if (month > 12) {
+        month = 1;
+        year++;
+      }
+      
+      loadReportData(year, month);
+    });
+
+    document.getElementById('downloadExcelBtn').addEventListener('click', function() {
+      const reportMonth = document.getElementById('reportMonth');
+      const year = parseInt(reportMonth.dataset.year);
+      const month = parseInt(reportMonth.dataset.month);
+      
+      fetch(`/api/reports/monthly/${year}/${month}/excel`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          if (response.status === 403) {
+            throw new Error('Недостаточно прав для скачивания отчета');
+          }
+          throw new Error(`Ошибка загрузки: ${response.status}`);
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Отчет_бронирования_${months[month-1]}_${year}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      })
+      .catch(error => {
+        console.error('Ошибка при скачивании отчета:', error);
+        alert(error.message);
+      });
+    });
+  </script>
+</body>
+</html>
