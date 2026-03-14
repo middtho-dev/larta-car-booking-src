@@ -46,11 +46,35 @@ function getFilteredBookings() {
 }
 
 
+
+function requireAuthToken() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/';
+        return null;
+    }
+    return token;
+}
+
+function notify(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 250);
+    }, 2600);
+}
+
 async function loadBookings() {
     try {
         const response = await fetch('/api/bookings/calendar', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -74,7 +98,7 @@ async function loadAvailableCars() {
     try {
         const response = await fetch('/api/cars/available', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -139,7 +163,7 @@ async function createBooking(event) {
     const endTime = document.getElementById('endDateTime').value;
     
     if (!carId || !startTime || !endTime) {
-        alert('Пожалуйста, заполните все поля');
+        notify('Пожалуйста, заполните все поля', 'warning');
         return;
     }
     
@@ -148,7 +172,7 @@ async function createBooking(event) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             },
             body: JSON.stringify({
                 car_id: parseInt(carId),
@@ -163,12 +187,12 @@ async function createBooking(event) {
             throw new Error(result.detail || 'Ошибка при создании бронирования');
         }
         
-        alert('Бронирование успешно создано');
+        notify('Бронирование успешно создано', 'success');
         closeCreateBookingModal();
         loadBookings(); 
         
     } catch (error) {
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -388,7 +412,7 @@ async function logout() {
         const response = await fetch('/logout', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -401,7 +425,7 @@ async function logout() {
         
     } catch (error) {
         console.error('Ошибка:', error);
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -409,7 +433,7 @@ async function checkAdminRights() {
     try {
         const response = await fetch('/auth/me', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -449,7 +473,7 @@ async function addCar(event) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             },
             body: JSON.stringify({ model, number_plate })
         });
@@ -460,13 +484,13 @@ async function addCar(event) {
             throw new Error(result.detail || 'Ошибка при добавлении автомобиля');
         }
         
-        alert('Автомобиль успешно добавлен');
+        notify('Автомобиль успешно добавлен', 'success');
         closeAddCarModal();
         loadBookings(); 
         
     } catch (error) {
         console.error('Ошибка:', error);
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -486,7 +510,7 @@ async function loadActiveBookings() {
     try {
         const response = await fetch('/api/bookings/calendar', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -553,7 +577,7 @@ async function loadActiveBookings() {
         
     } catch (error) {
         console.error('Ошибка:', error);
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -610,7 +634,7 @@ async function updateBookingStatus(bookingId, newStatus) {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             },
             body: JSON.stringify({ status: newStatus })
         });
@@ -625,11 +649,11 @@ async function updateBookingStatus(bookingId, newStatus) {
         loadBookings();
         
         const statusText = newStatus === 'completed' ? 'завершено' : 'отменено';
-        alert(`Бронирование успешно ${statusText}`);
+        notify(`Бронирование успешно ${statusText}`, 'success');
         
     } catch (error) {
         console.error('Ошибка:', error);
-        alert(error.message);
+        notify(error.message, 'error');
     }
 }
 
@@ -647,7 +671,7 @@ async function getCurrentUser() {
     try {
         const response = await fetch('/auth/me', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -678,7 +702,7 @@ async function cancelUserBooking(bookingId) {
         const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
             method: 'DELETE',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${requireAuthToken()}`
             }
         });
         
@@ -688,16 +712,20 @@ async function cancelUserBooking(bookingId) {
         }
         
         const data = await response.json();
-        alert('Бронирование успешно отменено');
+        notify('Бронирование успешно отменено', 'success');
         document.getElementById('bookingModal').style.display = 'none';
         refreshCalendar();
     } catch (error) {
-        alert(`Ошибка: ${error.message}`);
+        notify(`Ошибка: ${error.message}`, 'error');
     }
 }
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (!requireAuthToken()) {
+        return;
+    }
+
     loadBookings();
     checkAdminRights();
 
