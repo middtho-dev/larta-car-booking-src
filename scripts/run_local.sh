@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-MODE="${1:-}"
+MODE=""
 SKIP_INSTALL=0
 SKIP_DB_CHECK=0
 INIT_DB=1
@@ -12,6 +12,9 @@ AUTO_DB_CONTAINER=1
 
 for arg in "$@"; do
   case "$arg" in
+    api|bot)
+      MODE="$arg"
+      ;;
     --skip-install)
       SKIP_INSTALL=1
       ;;
@@ -31,6 +34,12 @@ if [[ ! -f .env ]]; then
   echo "[ERROR] .env not found. Copy .env.example to .env and fill it." >&2
   exit 1
 fi
+
+# Load .env into current shell for Python checks and runtime.
+set -a
+# shellcheck disable=SC1091
+source .env
+set +a
 
 if [[ ! -d .venv ]]; then
   python3 -m venv .venv
@@ -145,6 +154,33 @@ raise SystemExit(asyncio.run(create_if_missing()))
 PY3
 }
 
+run_container_fresh() {
+  local container="$1"
+  local user="$2"
+  local pass="$3"
+  local name="$4"
+  local port="$5"
+
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  docker run -d \
+    --name "$container" \
+    -e POSTGRES_USER="$user" \
+    -e POSTGRES_PASSWORD="$pass" \
+    -e POSTGRES_DB="$name" \
+    -p "$port:5432" \
+    postgres:16-alpine >/dev/null
+}
+
+wait_for_db_ready() {
+  for _ in $(seq 1 40); do
+    if check_db >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 start_local_db_container() {
   local host="${DB_HOST:-127.0.0.1}"
   local port="${DB_PORT:-5432}"
@@ -168,25 +204,30 @@ start_local_db_container() {
   if docker ps -a --format '{{.Names}}' | grep -Fxq "$container"; then
     docker start "$container" >/dev/null || true
   else
-    docker run -d \
-      --name "$container" \
-      -e POSTGRES_USER="$user" \
-      -e POSTGRES_PASSWORD="$pass" \
-      -e POSTGRES_DB="$name" \
-      -p "$port:5432" \
-      postgres:16-alpine >/dev/null
+    if ! run_container_fresh "$container" "$user" "$pass" "$name" "$port"; then
+      echo "[ERROR] Failed to run postgres container (port conflict or docker issue)." >&2
+      return 1
+    fi
   fi
 
-  # wait up to 30s
-  for _ in $(seq 1 30); do
-    if check_db >/dev/null 2>&1; then
-      echo "[OK] Local PostgreSQL container is ready on $host:$port"
-      return 0
-    fi
-    sleep 1
-  done
+  if wait_for_db_ready; then
+    echo "[OK] Local PostgreSQL container is ready on $host:$port"
+    return 0
+  fi
+
+  echo "[WARN] Existing container not ready or credentials mismatch. Recreating..."
+  if ! run_container_fresh "$container" "$user" "$pass" "$name" "$port"; then
+    echo "[ERROR] Failed to recreate postgres container." >&2
+    return 1
+  fi
+
+  if wait_for_db_ready; then
+    echo "[OK] Local PostgreSQL container is ready after recreate on $host:$port"
+    return 0
+  fi
 
   echo "[ERROR] Local PostgreSQL container did not become ready in time" >&2
+  docker logs --tail 100 "$container" >&2 || true
   return 1
 }
 
