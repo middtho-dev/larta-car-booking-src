@@ -233,6 +233,8 @@ function renderCalendar() {
     for (let day = 1; day <= daysInMonth; day++) {
         const calendarDay = document.createElement('div');
         calendarDay.className = 'calendar-day';
+        calendarDay.style.animationDelay = `${Math.min(day * 0.01, 0.25)}s`;
+
         
         const dateDiv = document.createElement('div');
         dateDiv.className = 'date';
@@ -400,6 +402,15 @@ document.getElementById('goToTodayBtn').onclick = () => {
     currentDate = new Date();
     renderCalendar();
 };
+
+document.getElementById('quickCreateBtn').onclick = () => {
+    showCreateBookingModal(new Date());
+};
+
+const fabCreate = document.getElementById('mobileFabCreate');
+if (fabCreate) {
+    fabCreate.onclick = () => showCreateBookingModal(new Date());
+}
 
 
 document.querySelector('.close').onclick = () => {
@@ -731,6 +742,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const searchInput = document.getElementById('bookingSearch');
     const statusFilter = document.getElementById('statusFilter');
+    const openWebAppBtn = document.getElementById('openWebAppBtn');
+
+    if (openWebAppBtn) {
+        openWebAppBtn.href = `${window.location.origin}/dashboard`;
+    }
 
     searchInput.addEventListener('input', (event) => {
         searchQuery = event.target.value;
