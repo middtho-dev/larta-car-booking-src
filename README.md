@@ -97,6 +97,14 @@ pip install -r requirements.txt
 ./scripts/run_local.sh bot
 ```
 
+💡 Быстрые флаги скрипта:
+
+```bash
+./scripts/run_local.sh api --skip-install    # если зависимости уже стоят
+./scripts/run_local.sh bot --skip-install
+./scripts/run_local.sh api --skip-db-check   # только если точно знаете, что делаете
+```
+
 ---
 
 ### 6) Запуск как systemd-сервисы (рекомендуется)
@@ -165,8 +173,8 @@ sudo systemctl status larta-bot --no-pager
 ```bash
 cd /opt/larta-car-booking-src
 git fetch origin
-git checkout work            # или твоя prod-ветка
-git pull --ff-only origin work
+git checkout main
+git pull --ff-only origin main
 
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -266,6 +274,9 @@ TIMEZONE=UTC
 sudo systemctl status postgresql --no-pager
 sudo -u postgres psql -c "\l"
 sudo -u postgres psql -c "CREATE DATABASE car_booking;"   # если еще нет
+
+# запуск без повторной установки пакетов
+./scripts/run_local.sh api --skip-install
 ```
 
 > Скрипт `./scripts/run_local.sh` теперь сам делает preflight-проверку подключения к БД и печатает понятные подсказки.

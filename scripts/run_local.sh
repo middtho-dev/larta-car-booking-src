@@ -4,6 +4,21 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+MODE="${1:-}"
+SKIP_INSTALL=0
+SKIP_DB_CHECK=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --skip-install)
+      SKIP_INSTALL=1
+      ;;
+    --skip-db-check)
+      SKIP_DB_CHECK=1
+      ;;
+  esac
+done
+
 if [[ ! -f .env ]]; then
   echo "[ERROR] .env not found. Copy .env.example to .env and fill it." >&2
   exit 1
@@ -14,14 +29,19 @@ if [[ ! -d .venv ]]; then
 fi
 
 source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+
+if [[ "$SKIP_INSTALL" -eq 0 ]]; then
+  pip install --upgrade pip
+  pip install -r requirements.txt
+else
+  echo "[INFO] Skipping dependency install (--skip-install)"
+fi
 
 # Required runtime directories
 mkdir -p photos logs
 
 check_db() {
-  python - <<'PY'
+  python - <<'PY2'
 import asyncio
 import os
 import asyncpg
@@ -44,24 +64,28 @@ async def main():
         return 1
 
 raise SystemExit(asyncio.run(main()))
-PY
+PY2
 }
 
-if [[ "${1:-}" == "api" ]]; then
-  if ! check_db; then
-    echo "[HINT] Check DB service and .env values: DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME" >&2
-    echo "[HINT] Ubuntu/Debian: sudo systemctl status postgresql" >&2
-    exit 1
-  fi
-  python -m api.start_api
-elif [[ "${1:-}" == "bot" ]]; then
-  if ! check_db; then
-    echo "[HINT] Bot requires DB at startup (create_database + pool)." >&2
-    echo "[HINT] Start PostgreSQL and re-run: ./scripts/run_local.sh bot" >&2
-    exit 1
-  fi
-  python main.py
-else
-  echo "Usage: $0 [api|bot]"
+if [[ "$MODE" != "api" && "$MODE" != "bot" ]]; then
+  echo "Usage: $0 [api|bot] [--skip-install] [--skip-db-check]"
   exit 1
+fi
+
+if [[ "$SKIP_DB_CHECK" -eq 0 ]]; then
+  if ! check_db; then
+    echo "[HINT] Check .env values: DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME" >&2
+    echo "[HINT] PostgreSQL status: sudo systemctl status postgresql --no-pager" >&2
+    echo "[HINT] Start PostgreSQL: sudo systemctl enable --now postgresql" >&2
+    echo "[HINT] Create DB if missing: sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME:-car_booking};"" >&2
+    exit 1
+  fi
+else
+  echo "[WARN] Skipping DB preflight (--skip-db-check)"
+fi
+
+if [[ "$MODE" == "api" ]]; then
+  python -m api.start_api
+else
+  python main.py
 fi
