@@ -24,11 +24,20 @@ install_caddy() {
 
   echo "[INFO] Installing Caddy..."
   apt update
-  apt install -y debian-keyring debian-archive-keyring apt-transport-https curl gnupg
+  apt install -y debian-keyring debian-archive-keyring apt-transport-https ca-certificates curl gnupg lsb-release
 
   install -m 0755 -d /etc/apt/keyrings
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /etc/apt/keyrings/caddy-stable-archive-keyring.gpg
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+
+  echo "[INFO] Installing Caddy Cloudsmith keyring..."
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+    | gpg --dearmor \
+    | tee /usr/share/keyrings/caddy-stable-archive-keyring.gpg >/dev/null
+
+  echo "[INFO] Writing Caddy apt source with signed-by keyring..."
+  cat > /etc/apt/sources.list.d/caddy-stable.list <<'EOF'
+deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
+deb-src [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
+EOF
 
   apt update
   apt install -y caddy
