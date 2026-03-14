@@ -514,6 +514,20 @@ async def main():
             
         logger.debug("Creating database pool...")
         await db.create_pool()
+
+        bootstrap_admin_id = os.getenv("FIRST_ADMIN_TELEGRAM_ID", "").strip()
+        if bootstrap_admin_id:
+            try:
+                ok = await db.set_admin_by_telegram_id(int(bootstrap_admin_id), True)
+                if ok:
+                    logger.info(f"Bootstrap admin ensured for telegram_id={bootstrap_admin_id}")
+                else:
+                    logger.warning(
+                        "FIRST_ADMIN_TELEGRAM_ID is set, but user not found in DB yet. "
+                        "User must open /start once, then restart bot."
+                    )
+            except ValueError:
+                logger.error("FIRST_ADMIN_TELEGRAM_ID must be an integer")
         
         logger.debug("Starting booking notifier...")
         notifier = BookingNotifier(bot, db)
