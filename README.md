@@ -103,6 +103,7 @@ pip install -r requirements.txt
 ./scripts/run_local.sh api --skip-install    # если зависимости уже стоят
 ./scripts/run_local.sh bot --skip-install
 ./scripts/run_local.sh api --skip-db-check   # только если точно знаете, что делаете
+./scripts/run_local.sh api --no-init-db      # не пытаться создавать БД автоматически
 ```
 
 ---
@@ -279,7 +280,7 @@ sudo -u postgres psql -c "CREATE DATABASE car_booking;"   # если еще не
 ./scripts/run_local.sh api --skip-install
 ```
 
-> Скрипт `./scripts/run_local.sh` теперь сам делает preflight-проверку подключения к БД и печатает понятные подсказки.
+> Скрипт `./scripts/run_local.sh` теперь сам делает preflight-проверку подключения к БД, а при необходимости **автоматически пытается создать БД** (`DB_NAME`).
 
 ---
 
