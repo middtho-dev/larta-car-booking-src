@@ -22,8 +22,12 @@ app = FastAPI(
     docs_url=None
 )
 
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "api/static")), name="static")
-app.mount("/photos", StaticFiles(directory=os.path.join(BASE_DIR, "photos")), name="photos")
+static_dir = os.path.join(BASE_DIR, "api/static")
+photos_dir = os.path.join(BASE_DIR, "photos")
+os.makedirs(photos_dir, exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/photos", StaticFiles(directory=photos_dir), name="photos")
 
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "api/templates"))
 
