@@ -44,10 +44,13 @@ def get_cancel_keyboard() -> InlineKeyboardMarkup:
     ]]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_calendar_keyboard() -> InlineKeyboardMarkup:
+def get_calendar_keyboard(token: str | None = None) -> InlineKeyboardMarkup:
+    base_url = (os.getenv("CAR_BOOKING_URL") or "").rstrip("/")
+    calendar_url = f"{base_url}/?token={token}" if token else base_url
+
     buttons = [
         [
-            InlineKeyboardButton(text="🌐 Открыть календарь", url=os.getenv("CAR_BOOKING_URL"))
+            InlineKeyboardButton(text="🌐 Открыть календарь", url=calendar_url)
         ],
         [
             InlineKeyboardButton(text="🔁 Обновить", callback_data="refresh_calendar")
