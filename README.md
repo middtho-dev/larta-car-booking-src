@@ -250,6 +250,28 @@ TIMEZONE=UTC
 
 ---
 
+
+## 🧪 Проверка окружения перед первым запуском
+
+Перед запуском API/бота убедись:
+
+- ✅ PostgreSQL запущен;
+- ✅ База `DB_NAME` существует;
+- ✅ В `.env` корректные `DB_*`;
+- ✅ Порт БД доступен.
+
+Полезные команды:
+
+```bash
+sudo systemctl status postgresql --no-pager
+sudo -u postgres psql -c "\l"
+sudo -u postgres psql -c "CREATE DATABASE car_booking;"   # если еще нет
+```
+
+> Скрипт `./scripts/run_local.sh` теперь сам делает preflight-проверку подключения к БД и печатает понятные подсказки.
+
+---
+
 ## ✅ Быстрые проверки перед релизом
 
 ```bash
@@ -267,6 +289,7 @@ python -m compileall api handlers main.py
 
 - ❌ **API не поднимается**
   - проверь `.env`;
+  - проверь статус PostgreSQL: `sudo systemctl status postgresql`;
   - посмотри `journalctl -u larta-api`.
 
 - ❌ **Бот не отправляет уведомления**
