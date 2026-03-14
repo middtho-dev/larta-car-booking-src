@@ -22,6 +22,27 @@
       </div>
       <button id="logoutBtn" class="btn-secondary">Выйти</button>
     </div>
+    <div class="calendar-toolbar">
+      <div class="toolbar-field">
+        <label for="bookingSearch">Поиск</label>
+        <input id="bookingSearch" type="search" placeholder="Авто, номер, клиент" />
+      </div>
+      <div class="toolbar-field">
+        <label for="statusFilter">Статус</label>
+        <select id="statusFilter">
+          <option value="all">Все</option>
+          <option value="active">Активно</option>
+          <option value="completed">Завершено</option>
+          <option value="canceled">Отменено</option>
+        </select>
+      </div>
+      <button id="goToTodayBtn" class="btn-secondary">Сегодня</button>
+    </div>
+    <div class="booking-legend">
+      <span><i class="legend-dot legend-active"></i>Активно</span>
+      <span><i class="legend-dot legend-completed"></i>Завершено</span>
+      <span><i class="legend-dot legend-canceled"></i>Отменено</span>
+    </div>
     <div id="calendar" class="calendar">
     </div>
   </div>

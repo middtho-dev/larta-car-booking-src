@@ -1,12 +1,49 @@
 let currentDate = new Date();
 let bookings = [];
 let availableCars = [];
+let searchQuery = '';
+let selectedStatus = 'all';
 
 const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const months = [
     'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
     'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
 ];
+
+
+function formatForDateTimeLocal(date) {
+    const pad = num => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getFilteredBookings() {
+    const normalized = searchQuery.trim().toLowerCase();
+    return bookings.filter((booking) => {
+        const statusMatch = selectedStatus === 'all' || booking.status === selectedStatus;
+        if (!statusMatch) {
+            return false;
+        }
+
+        if (!normalized) {
+            return true;
+        }
+
+        const searchable = [booking.model, booking.number_plate, booking.full_name]
+            .map((item) => String(item || '').toLowerCase())
+            .join(' ');
+
+        return searchable.includes(normalized);
+    });
+}
 
 
 async function loadBookings() {
@@ -74,13 +111,13 @@ function showCreateBookingModal(date) {
 
     const startDate = new Date(date);
     startDate.setHours(9, 0, 0);
-    startDateTime.value = startDate.toISOString().slice(0, 16);
+    startDateTime.value = formatForDateTimeLocal(startDate);
     
 
     const endDate = new Date(date);
     endDate.setDate(endDate.getDate() + 1);
     endDate.setHours(9, 0, 0);
-    endDateTime.value = endDate.toISOString().slice(0, 16);
+    endDateTime.value = formatForDateTimeLocal(endDate);
     
 
     loadAvailableCars();
@@ -188,7 +225,7 @@ function renderCalendar() {
         bookingsContainer.className = 'bookings-container';
         
     
-        const dayBookings = bookings.filter(booking => {
+        const dayBookings = getFilteredBookings().filter(booking => {
             const bookingDate = new Date(booking.start_time);
             return bookingDate.getDate() === day && 
                    bookingDate.getMonth() === month && 
@@ -249,14 +286,14 @@ function showBookingDetails(booking) {
    
     bookingInfo.innerHTML = `
         <h2>Информация о бронировании</h2>
-        <p><strong>Автомобиль:</strong> ${booking.model} (${booking.number_plate})</p>
-        <p><strong>Клиент:</strong> ${booking.full_name}</p>
-        <p><strong>ФИО:</strong> ${booking.description || 'Не указано'}</p>
-        <p><strong>Телефон:</strong> ${booking.phone_number || 'Не указан'}</p>
-        <p><strong>Телеграм:</strong> ${booking.telegram_id}</p>
-        <p><strong>Начало:</strong> ${startDate}</p>
-        <p><strong>Окончание:</strong> ${endDate}</p>
-        <p><strong>Статус:</strong> <span class="status-badge ${statusClass}">${statusText}</span></p>
+        <p><strong>Автомобиль:</strong> ${escapeHtml(booking.model)} (${escapeHtml(booking.number_plate)})</p>
+        <p><strong>Клиент:</strong> ${escapeHtml(booking.full_name)}</p>
+        <p><strong>ФИО:</strong> ${escapeHtml(booking.description || 'Не указано')}</p>
+        <p><strong>Телефон:</strong> ${escapeHtml(booking.phone_number || 'Не указан')}</p>
+        <p><strong>Телеграм:</strong> ${escapeHtml(booking.telegram_id)}</p>
+        <p><strong>Начало:</strong> ${escapeHtml(startDate)}</p>
+        <p><strong>Окончание:</strong> ${escapeHtml(endDate)}</p>
+        <p><strong>Статус:</strong> <span class="status-badge ${statusClass}">${escapeHtml(statusText)}</span></p>
     `;
     
    
@@ -264,7 +301,10 @@ function showBookingDetails(booking) {
     afterPhotos.innerHTML = '';
     
     
-    booking.photos.before.forEach(photo => {
+    const before = booking.photos?.before || [];
+    const after = booking.photos?.after || [];
+
+    before.forEach(photo => {
         const img = document.createElement('img');
         img.src = photo;
         img.className = 'photo-thumbnail';
@@ -273,7 +313,7 @@ function showBookingDetails(booking) {
     });
     
     
-    booking.photos.after.forEach(photo => {
+    after.forEach(photo => {
         const img = document.createElement('img');
         img.src = photo;
         img.className = 'photo-thumbnail';
@@ -329,6 +369,11 @@ document.getElementById('prevMonth').onclick = () => {
 
 document.getElementById('nextMonth').onclick = () => {
     currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar();
+};
+
+document.getElementById('goToTodayBtn').onclick = () => {
+    currentDate = new Date();
     renderCalendar();
 };
 
@@ -543,8 +588,8 @@ function addBookingItem(booking, container) {
     bookingItem.className = 'booking-item';
     bookingItem.innerHTML = `
         <div class="booking-info">
-            <p><strong>Клиент:</strong> ${booking.full_name}</p>
-            <p><strong>Автомобиль:</strong> ${booking.model} (${booking.number_plate})</p>
+            <p><strong>Клиент:</strong> ${escapeHtml(booking.full_name)}</p>
+            <p><strong>Автомобиль:</strong> ${escapeHtml(booking.model)} (${escapeHtml(booking.number_plate)})</p>
             <p><strong>Период:</strong> ${startDate} - ${endDate}</p>
             <p><strong>Статус:</strong> <span class="status-badge ${statusClass}">${statusText}</span></p>
         </div>
@@ -655,6 +700,20 @@ async function cancelUserBooking(bookingId) {
 document.addEventListener('DOMContentLoaded', () => {
     loadBookings();
     checkAdminRights();
+
+    const searchInput = document.getElementById('bookingSearch');
+    const statusFilter = document.getElementById('statusFilter');
+
+    searchInput.addEventListener('input', (event) => {
+        searchQuery = event.target.value;
+        renderCalendar();
+    });
+
+    statusFilter.addEventListener('change', (event) => {
+        selectedStatus = event.target.value;
+        renderCalendar();
+    });
+
     document.getElementById('createBookingForm').addEventListener('submit', createBooking);
     document.getElementById('logoutBtn').addEventListener('click', logout);
     document.getElementById('addCarBtn').addEventListener('click', showAddCarModal);
