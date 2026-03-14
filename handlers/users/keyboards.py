@@ -1,18 +1,13 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 import os
 
 def get_start_keyboard() -> InlineKeyboardMarkup:
     buttons = [
         [
-            InlineKeyboardButton(text="🚗 Забронировать авто", callback_data="book_car"),
-            InlineKeyboardButton(text="📋 Мои бронирования", callback_data="my_bookings")
-        ],
-        [   
-            InlineKeyboardButton(text="🗓️ Календарь", callback_data="calendar"),
-            InlineKeyboardButton(text="❓ Помощь", callback_data="help")
+            InlineKeyboardButton(text="🧭 Открыть мини-приложение", callback_data="calendar")
         ]
     ]
-    
+
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_cars_keyboard(cars: list) -> InlineKeyboardMarkup:
@@ -44,10 +39,13 @@ def get_cancel_keyboard() -> InlineKeyboardMarkup:
     ]]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_calendar_keyboard() -> InlineKeyboardMarkup:
+def get_calendar_keyboard(token: str | None = None) -> InlineKeyboardMarkup:
+    base_url = (os.getenv("CAR_BOOKING_URL") or "").rstrip("/")
+    calendar_url = f"{base_url}/?token={token}" if token else base_url
+
     buttons = [
         [
-            InlineKeyboardButton(text="🌐 Открыть календарь", url=os.getenv("CAR_BOOKING_URL"))
+            InlineKeyboardButton(text="🌐 Открыть мини-приложение", web_app=WebAppInfo(url=calendar_url))
         ],
         [
             InlineKeyboardButton(text="🔁 Обновить", callback_data="refresh_calendar")
