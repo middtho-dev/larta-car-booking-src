@@ -6,6 +6,7 @@ from aiogram.exceptions import TelegramBadRequest
 async def show_calendar_token(callback: types.CallbackQuery, db):
     """Показывает токен для доступа к календарю"""
     try:
+        token = None
         user = await db.get_user_by_telegram_id(callback.from_user.id)
         if not user:
             error_text = "❌ Ошибка: пользователь не найден. Пожалуйста, перезапустите бота командой /start"
@@ -34,12 +35,12 @@ async def show_calendar_token(callback: types.CallbackQuery, db):
                 if callback.message.photo:
                     await callback.message.edit_caption(
                         caption=error_text,
-                        reply_markup=get_calendar_keyboard()
+                        reply_markup=get_calendar_keyboard(token)
                     )
                 else:
                     await callback.message.edit_text(
                         text=error_text,
-                        reply_markup=get_calendar_keyboard()
+                        reply_markup=get_calendar_keyboard(token)
                     )
                 return
 
@@ -56,13 +57,13 @@ async def show_calendar_token(callback: types.CallbackQuery, db):
             if callback.message.photo:
                 await callback.message.edit_caption(
                     caption=text,
-                    reply_markup=get_calendar_keyboard(),
+                    reply_markup=get_calendar_keyboard(token),
                     parse_mode="HTML"
                 )
             else:
                 await callback.message.edit_text(
                     text=text,
-                    reply_markup=get_calendar_keyboard(),
+                    reply_markup=get_calendar_keyboard(token),
                     parse_mode="HTML"
                 )
         except TelegramBadRequest as e:
@@ -83,12 +84,12 @@ async def show_calendar_token(callback: types.CallbackQuery, db):
             if callback.message.photo:
                 await callback.message.edit_caption(
                     caption=error_text,
-                    reply_markup=get_calendar_keyboard()
+                    reply_markup=get_calendar_keyboard(token)
                 )
             else:
                 await callback.message.edit_text(
                     text=error_text,
-                    reply_markup=get_calendar_keyboard()
+                    reply_markup=get_calendar_keyboard(token)
                 )
 
 async def refresh_calendar_token(callback: types.CallbackQuery, db):
