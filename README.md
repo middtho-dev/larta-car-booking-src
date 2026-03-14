@@ -218,37 +218,60 @@ journalctl -u larta-bot -n 200 --no-pager
 ---
 
 
-## 🔐 HTTPS, если порт 443 уже занят
+## 🔐 HTTPS через Caddy (автосертификаты и автопродление)
 
-Telegram WebApp требует HTTPS. Если у тебя на `:443` уже крутится Nginx/другой сайт — это нормально.
+Если ты освободил `:443`, самый простой production-вариант — Caddy как reverse proxy.
 
-Схема: `443 (Nginx с сертификатом) -> proxy_pass -> 127.0.0.1:8000`
+### Почему Caddy ✅
+- автоматически получает сертификат Let's Encrypt;
+- автоматически продлевает сертификат;
+- не перевыпускает сертификат на каждый запуск (использует сохраненное состояние);
+- простая конфигурация и reload без простоя.
 
-Пример блока `location` в существующем `server` (`journal.kv9.ru`):
+### 1) Подготовка
 
-```nginx
-location /carapp/ {
-    proxy_pass http://127.0.0.1:8000/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
+Убедись, что:
+- DNS `A`-запись домена (`journal.kv9.ru`) указывает на IP сервера;
+- порты 80 и 443 открыты в firewall/security-group;
+- приложение запущено локально на `127.0.0.1:8000`.
+- если `:80/:443` заняты, останови конфликтующий сервис (`nginx`, `apache2`, другой proxy).
 
-Тогда в `.env`:
-
-```env
-CAR_BOOKING_URL=https://journal.kv9.ru/carapp
-WEB_APP_URL=https://journal.kv9.ru/carapp/dashboard
-```
-
-Проверка и перезагрузка Nginx:
+### 2) Автонастройка Caddy (скрипт)
 
 ```bash
-sudo nginx -t
-sudo systemctl reload nginx
+cd /opt/larta-car-booking-src
+sudo ./scripts/setup_caddy.sh journal.kv9.ru 127.0.0.1:8000 admin@kv9.ru
 ```
+
+Что делает скрипт:
+- устанавливает Caddy (если еще не установлен);
+- настраивает импорт `/etc/caddy/sites/*.caddy`;
+- пишет конфиг сайта `/etc/caddy/sites/larta-car-booking.caddy`;
+- валидирует конфиг;
+- включает и перезагружает сервис.
+
+### 3) Настройка `.env`
+
+```env
+CAR_BOOKING_URL=https://journal.kv9.ru
+WEB_APP_URL=https://journal.kv9.ru/dashboard
+```
+
+### 4) Проверка
+
+```bash
+systemctl status caddy --no-pager
+journalctl -u caddy -n 200 --no-pager
+curl -I https://journal.kv9.ru
+```
+
+### 5) Важно про сертификаты
+
+Caddy хранит сертификаты и состояние ACME здесь:
+- `/var/lib/caddy/.local/share/caddy`
+- `/var/lib/caddy/.local/state/caddy`
+
+Пока эти директории не удалены, сертификаты **не будут запрашиваться заново при каждом запуске**. Caddy сам обновит их, когда нужно.
 
 ---
 
