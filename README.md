@@ -35,6 +35,25 @@ Larta Car Booking состоит из двух частей:
 
 ---
 
+
+## 👑 Как назначить первого администратора
+
+Есть 2 способа:
+
+1. **Через `.env` (автобутстрап при старте бота)**
+   - укажи `FIRST_ADMIN_TELEGRAM_ID=<ID>`
+   - перезапусти бота
+   - важно: пользователь должен хотя бы 1 раз нажать `/start` в боте
+
+2. **Через скрипт вручную**
+```bash
+python scripts/set_admin.py <telegram_id> on
+# снять права:
+python scripts/set_admin.py <telegram_id> off
+```
+
+---
+
 ## 📦 Установка с GitHub (Production)
 
 Ниже — «боевой» сценарий на Linux-сервере.
@@ -194,6 +213,41 @@ sudo systemctl restart larta-bot
 ```bash
 journalctl -u larta-api -n 200 --no-pager
 journalctl -u larta-bot -n 200 --no-pager
+```
+
+---
+
+
+## 🔐 HTTPS, если порт 443 уже занят
+
+Telegram WebApp требует HTTPS. Если у тебя на `:443` уже крутится Nginx/другой сайт — это нормально.
+
+Схема: `443 (Nginx с сертификатом) -> proxy_pass -> 127.0.0.1:8000`
+
+Пример блока `location` в существующем `server` (`journal.kv9.ru`):
+
+```nginx
+location /carapp/ {
+    proxy_pass http://127.0.0.1:8000/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Тогда в `.env`:
+
+```env
+CAR_BOOKING_URL=https://journal.kv9.ru/carapp
+WEB_APP_URL=https://journal.kv9.ru/carapp/dashboard
+```
+
+Проверка и перезагрузка Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 ---

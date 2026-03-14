@@ -879,6 +879,25 @@ class Database:
             return False
 
 
+
+    async def set_admin_by_telegram_id(self, telegram_id: int, is_admin: bool = True) -> bool:
+        """Назначает/снимает админ-роль по telegram_id."""
+        try:
+            async with self.pool.acquire() as conn:
+                result = await conn.execute(
+                    """
+                    UPDATE users
+                    SET admin = $2
+                    WHERE telegram_id = $1
+                    """,
+                    telegram_id,
+                    is_admin,
+                )
+                return result != "UPDATE 0"
+        except Exception as e:
+            logger.error(f"Error setting admin by telegram_id: {e}")
+            return False
+
     async def get_users_for_admin_panel(self) -> list:
         """Возвращает пользователей для управления правами админов."""
         try:
