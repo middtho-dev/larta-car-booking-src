@@ -8,6 +8,7 @@ MODE="${1:-}"
 SKIP_INSTALL=0
 SKIP_DB_CHECK=0
 INIT_DB=1
+AUTO_DB_CONTAINER=1
 
 for arg in "$@"; do
   case "$arg" in
@@ -19,6 +20,9 @@ for arg in "$@"; do
       ;;
     --no-init-db)
       INIT_DB=0
+      ;;
+    --no-auto-db-container)
+      AUTO_DB_CONTAINER=0
       ;;
   esac
 done
@@ -141,14 +145,77 @@ raise SystemExit(asyncio.run(create_if_missing()))
 PY3
 }
 
+start_local_db_container() {
+  local host="${DB_HOST:-127.0.0.1}"
+  local port="${DB_PORT:-5432}"
+  local user="${DB_USER:-postgres}"
+  local pass="${DB_PASS:-postgres}"
+  local name="${DB_NAME:-car_booking}"
+  local container="${LOCAL_DB_CONTAINER_NAME:-larta-postgres-local}"
+
+  if [[ "$host" != "127.0.0.1" && "$host" != "localhost" ]]; then
+    echo "[INFO] DB_HOST is '$host' (not local). Auto docker DB start skipped." >&2
+    return 1
+  fi
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "[INFO] Docker not found. Cannot auto-start local PostgreSQL container." >&2
+    return 1
+  fi
+
+  echo "[INFO] Trying to start local PostgreSQL in Docker container '$container'..."
+
+  if docker ps -a --format '{{.Names}}' | grep -Fxq "$container"; then
+    docker start "$container" >/dev/null || true
+  else
+    docker run -d \
+      --name "$container" \
+      -e POSTGRES_USER="$user" \
+      -e POSTGRES_PASSWORD="$pass" \
+      -e POSTGRES_DB="$name" \
+      -p "$port:5432" \
+      postgres:16-alpine >/dev/null
+  fi
+
+  # wait up to 30s
+  for _ in $(seq 1 30); do
+    if check_db >/dev/null 2>&1; then
+      echo "[OK] Local PostgreSQL container is ready on $host:$port"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "[ERROR] Local PostgreSQL container did not become ready in time" >&2
+  return 1
+}
+
 if [[ "$MODE" != "api" && "$MODE" != "bot" ]]; then
-  echo "Usage: $0 [api|bot] [--skip-install] [--skip-db-check] [--no-init-db]"
+  echo "Usage: $0 [api|bot] [--skip-install] [--skip-db-check] [--no-init-db] [--no-auto-db-container]"
   exit 1
 fi
 
 if [[ "$SKIP_DB_CHECK" -eq 0 ]]; then
   if ! check_db; then
-    if [[ "$INIT_DB" -eq 1 ]]; then
+    if [[ "$AUTO_DB_CONTAINER" -eq 1 ]]; then
+      if start_local_db_container; then
+        :
+      elif [[ "$INIT_DB" -eq 1 ]]; then
+        echo "[INFO] Trying to auto-create database '${DB_NAME:-car_booking}'..."
+        if ! init_db_if_needed; then
+          echo "[HINT] Check .env values: DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME" >&2
+          echo "[HINT] PostgreSQL status: sudo systemctl status postgresql --no-pager" >&2
+          echo "[HINT] Start PostgreSQL: sudo systemctl enable --now postgresql" >&2
+          echo "[HINT] Create DB manually (if needed): sudo -u postgres psql -c \"CREATE DATABASE ${DB_NAME:-car_booking};\"" >&2
+          exit 1
+        fi
+      else
+        echo "[HINT] Check .env values: DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME" >&2
+        echo "[HINT] PostgreSQL status: sudo systemctl status postgresql --no-pager" >&2
+        echo "[HINT] Start PostgreSQL: sudo systemctl enable --now postgresql" >&2
+        exit 1
+      fi
+    elif [[ "$INIT_DB" -eq 1 ]]; then
       echo "[INFO] Trying to auto-create database '${DB_NAME:-car_booking}'..."
       if ! init_db_if_needed; then
         echo "[HINT] Check .env values: DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME" >&2
@@ -161,7 +228,6 @@ if [[ "$SKIP_DB_CHECK" -eq 0 ]]; then
       echo "[HINT] Check .env values: DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME" >&2
       echo "[HINT] PostgreSQL status: sudo systemctl status postgresql --no-pager" >&2
       echo "[HINT] Start PostgreSQL: sudo systemctl enable --now postgresql" >&2
-      echo "[HINT] Create DB manually (if needed): sudo -u postgres psql -c \"CREATE DATABASE ${DB_NAME:-car_booking};\"" >&2
       exit 1
     fi
   fi

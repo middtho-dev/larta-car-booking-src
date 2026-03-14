@@ -104,6 +104,7 @@ pip install -r requirements.txt
 ./scripts/run_local.sh bot --skip-install
 ./scripts/run_local.sh api --skip-db-check   # только если точно знаете, что делаете
 ./scripts/run_local.sh api --no-init-db      # не пытаться создавать БД автоматически
+./scripts/run_local.sh api --no-auto-db-container  # не поднимать Postgres в Docker автоматически
 ```
 
 ---
@@ -255,6 +256,7 @@ CHECK_INTERVAL=60
 NOTIFY_TIME=1
 NOTIFICATION_CLEANUP_GRACE_MINUTES=10
 TIMEZONE=UTC
+LOCAL_DB_CONTAINER_NAME=larta-postgres-local
 ```
 
 ---
@@ -280,7 +282,9 @@ sudo -u postgres psql -c "CREATE DATABASE car_booking;"   # если еще не
 ./scripts/run_local.sh api --skip-install
 ```
 
-> Скрипт `./scripts/run_local.sh` теперь сам делает preflight-проверку подключения к БД, а при необходимости **автоматически пытается создать БД** (`DB_NAME`).
+> Скрипт `./scripts/run_local.sh` теперь сам делает preflight-проверку подключения к БД.
+> Если БД недоступна и Docker установлен — скрипт пытается поднять локальный PostgreSQL в контейнере.
+> Если сервер PostgreSQL доступен, но базы нет — скрипт пытается создать `DB_NAME` автоматически.
 
 ---
 
