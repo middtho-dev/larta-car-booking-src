@@ -18,13 +18,51 @@
       <div class="admin-controls" style="display: none;">
         <button id="addCarBtn" class="btn-primary">Добавить автомобиль</button>
         <button id="reportBtn" class="btn-primary">Отчет</button>
+        <button id="manageAdminsBtn" class="btn-primary">Админы</button>
         <button id="cancelBookingBtn" class="btn-secondary" data-modal="manageBookingsModal" onclick="document.getElementById('manageBookingsModal').style.display = 'block';">Отменить бронь</button>
       </div>
       <button id="logoutBtn" class="btn-secondary">Выйти</button>
     </div>
+
+    <div class="app-shortcuts">
+      <a id="openWebAppBtn" class="btn-secondary webapp-link" href="/dashboard">Открыть веб-приложение</a>
+      <button id="quickCreateBtn" class="btn-primary">+ Быстрая бронь</button>
+    </div>
+    <div class="calendar-toolbar">
+      <div class="toolbar-field">
+        <label for="bookingSearch">Поиск</label>
+        <input id="bookingSearch" type="search" placeholder="Авто, номер, клиент" />
+      </div>
+      <div class="toolbar-field">
+        <label for="activityFilter">Действия</label>
+        <select id="activityFilter">
+          <option value="all">Все</option>
+          <option value="open">Открытые</option>
+          <option value="closed">Закрытые</option>
+        </select>
+      </div>
+      <div class="toolbar-field">
+        <label for="statusFilter">Статус</label>
+        <select id="statusFilter">
+          <option value="all">Все</option>
+          <option value="active">Активно</option>
+          <option value="completed">Завершено</option>
+          <option value="canceled">Отменено</option>
+        </select>
+      </div>
+      <button id="goToTodayBtn" class="btn-secondary">Сегодня</button>
+    </div>
+    <div class="booking-legend">
+      <span><i class="legend-dot legend-active"></i>Активно</span>
+      <span><i class="legend-dot legend-completed"></i>Завершено</span>
+      <span><i class="legend-dot legend-canceled"></i>Отменено</span>
+    </div>
     <div id="calendar" class="calendar">
     </div>
   </div>
+
+
+  <button id="mobileFabCreate" class="mobile-fab" aria-label="Создать бронирование">＋</button>
 
   <div id="bookingModal" class="modal">
     <div class="modal-content glass">
@@ -170,6 +208,16 @@
     </div>
   </div>
 
+
+  <div id="manageAdminsModal" class="modal">
+    <div class="modal-content glass">
+      <span class="close" onclick="document.getElementById('manageAdminsModal').style.display='none';">&times;</span>
+      <h2>Управление администраторами</h2>
+      <div id="adminsList" class="bookings-list"></div>
+    </div>
+  </div>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/js/lightbox.min.js"></script>
   <script src="/static/js/calendar.js"></script>
   
@@ -585,6 +633,77 @@
       document.getElementById('addCarModal').style.display = 'block';
       loadCarsList();
     });
+
+
+    document.getElementById('manageAdminsBtn').addEventListener('click', function() {
+      loadAdminsPanel();
+      document.getElementById('manageAdminsModal').style.display = 'block';
+    });
+
+    function loadAdminsPanel() {
+      const list = document.getElementById('adminsList');
+      list.innerHTML = '<div style="text-align:center;padding:20px;"><div class="loading-spinner"></div><p>Загрузка...</p></div>';
+
+      fetch('/api/users/admin-panel', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(users => {
+        if (!users.length) {
+          list.innerHTML = '<p style="text-align:center;padding:20px;">Пользователи не найдены</p>';
+          return;
+        }
+
+        list.innerHTML = '';
+        users.forEach(user => {
+          const item = document.createElement('div');
+          item.className = 'booking-item';
+          item.innerHTML = `
+            <div class="booking-details improved">
+              <div class="detail-row"><span class="label">ID:</span><span>${user.id}</span></div>
+              <div class="detail-row"><span class="label">Пользователь:</span><span>${user.full_name || 'Без имени'}</span></div>
+              <div class="detail-row"><span class="label">Telegram:</span><span>${user.telegram_id}</span></div>
+              <div class="detail-row"><span class="label">Телефон:</span><span>${user.phone_number || 'Не указан'}</span></div>
+            </div>
+            <div class="booking-actions">
+              <button class="${user.admin ? 'btn-cancel' : 'btn-complete'}" onclick="toggleAdmin(${user.id}, ${!user.admin})">
+                ${user.admin ? 'Снять админа' : 'Сделать админом'}
+              </button>
+            </div>
+          `;
+          list.appendChild(item);
+        });
+      })
+      .catch(error => {
+        list.innerHTML = `<p style="text-align:center;padding:20px;color:#ff6b6b;">Ошибка: ${error.message}</p>`;
+      });
+    }
+
+    function toggleAdmin(userId, isAdmin) {
+      fetch(`/api/users/${userId}/admin`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ admin: isAdmin })
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(data => { throw new Error(data.detail || `HTTP ${response.status}`); });
+        }
+        return response.json();
+      })
+      .then(() => loadAdminsPanel())
+      .catch(error => alert(`Ошибка: ${error.message}`));
+    }
 
     document.getElementById('reportBtn').addEventListener('click', function() {
       loadReport();
