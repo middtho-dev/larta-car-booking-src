@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from handlers.db.database import Database
 from typing import Dict
 from loguru import logger
+import os
 
 router = APIRouter()
 security = HTTPBearer()
@@ -40,7 +41,15 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
 async def root(request: Request):
     """Отображение страницы авторизации"""
     try:
-        return templates.TemplateResponse("auth.html", {"request": request})
+        bot_username = os.getenv("BOT_USERNAME", "")
+        bot_url = f"https://t.me/{bot_username}" if bot_username else "https://t.me"
+        return templates.TemplateResponse(
+            "auth.html",
+            {
+                "request": request,
+                "bot_url": bot_url,
+            },
+        )
     except Exception as e:
         logger.error(f"Error rendering auth template: {e}")
         raise HTTPException(status_code=500, detail=str(e))
