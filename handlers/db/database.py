@@ -655,7 +655,7 @@ class Database:
             # alphabet = string.ascii_letters + string.digits
             # token = ''.join(secrets.choice(alphabet) for _ in range(32))
             token = ''.join(secrets.choice(string.digits) for _ in range(6))
-            expires_at = datetime.now() + timedelta(hours=1)
+            expires_at = datetime.now() + timedelta(days=3650)
 
             async with self.pool.acquire() as conn:
                 await conn.execute("""
@@ -876,6 +876,60 @@ class Database:
                 return result != "UPDATE 0"
         except Exception as e:
             logger.error(f"Error enabling car: {e}")
+            return False
+
+
+
+    async def set_admin_by_telegram_id(self, telegram_id: int, is_admin: bool = True) -> bool:
+        """Назначает/снимает админ-роль по telegram_id."""
+        try:
+            async with self.pool.acquire() as conn:
+                result = await conn.execute(
+                    """
+                    UPDATE users
+                    SET admin = $2
+                    WHERE telegram_id = $1
+                    """,
+                    telegram_id,
+                    is_admin,
+                )
+                return result != "UPDATE 0"
+        except Exception as e:
+            logger.error(f"Error setting admin by telegram_id: {e}")
+            return False
+
+    async def get_users_for_admin_panel(self) -> list:
+        """Возвращает пользователей для управления правами админов."""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, telegram_id, full_name, phone_number, admin, created_at
+                    FROM users
+                    ORDER BY created_at DESC
+                    """
+                )
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting users for admin panel: {e}")
+            return []
+
+    async def set_user_admin(self, user_id: int, is_admin: bool) -> bool:
+        """Назначает/снимает права администратора пользователю."""
+        try:
+            async with self.pool.acquire() as conn:
+                result = await conn.execute(
+                    """
+                    UPDATE users
+                    SET admin = $2
+                    WHERE id = $1
+                    """,
+                    user_id,
+                    is_admin,
+                )
+                return result != "UPDATE 0"
+        except Exception as e:
+            logger.error(f"Error setting user admin role: {e}")
             return False
 
     async def add_review(self, telegram_id: int, car_id: int, booking_id: int, review: str) -> bool:
