@@ -265,7 +265,9 @@ journalctl -u caddy -n 200 --no-pager
 curl -I https://journal.kv9.ru
 ```
 
-Если при установке Caddy видишь ошибку вида `NO_PUBKEY ...`/`repository ... is not signed`, просто обнови скрипт до актуальной версии и запусти его повторно — он перезапишет source с `signed-by` и установит keyring корректно.
+Если при установке Caddy видишь ошибку вида `NO_PUBKEY ...`/`repository ... is not signed`, обнови проект и снова запусти `setup_caddy.sh`.
+
+Скрипт сам уберет старые `caddy*.list`, создаст source с `signed-by` и поставит keyring заново.
 
 ### 5) Важно про сертификаты
 

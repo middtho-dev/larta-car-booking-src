@@ -23,6 +23,14 @@ install_caddy() {
   fi
 
   echo "[INFO] Installing Caddy..."
+  # Old/broken caddy source definitions can break `apt update` with NO_PUBKEY.
+  # Move them out of the way first, then recreate source with explicit signed-by.
+  for old_source in /etc/apt/sources.list.d/caddy-stable.list /etc/apt/sources.list.d/caddy.list; do
+    if [[ -f "$old_source" ]]; then
+      mv "$old_source" "${old_source}.bak.$(date +%F-%H%M%S)"
+    fi
+  done
+
   apt update
   apt install -y debian-keyring debian-archive-keyring apt-transport-https ca-certificates curl gnupg lsb-release
 
