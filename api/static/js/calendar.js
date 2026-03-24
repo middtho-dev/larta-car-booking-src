@@ -4,6 +4,7 @@ let availableCars = [];
 let searchQuery = '';
 let selectedStatus = 'all';
 let selectedActivity = 'all';
+let selectedSort = 'newest';
 
 const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const months = [
@@ -28,7 +29,7 @@ function escapeHtml(value) {
 
 function getFilteredBookings() {
     const normalized = searchQuery.trim().toLowerCase();
-    return bookings.filter((booking) => {
+    const filtered = bookings.filter((booking) => {
         const isOpenAction = booking.status === 'active';
         const activityMatch = selectedActivity === 'all'
             || (selectedActivity === 'open' && isOpenAction)
@@ -53,6 +54,26 @@ function getFilteredBookings() {
 
         return searchable.includes(normalized);
     });
+
+    filtered.sort((a, b) => {
+        if (selectedSort === 'open_first') {
+            const aOpen = a.status === 'active' ? 0 : 1;
+            const bOpen = b.status === 'active' ? 0 : 1;
+            if (aOpen !== bOpen) {
+                return aOpen - bOpen;
+            }
+        } else if (selectedSort === 'closed_first') {
+            const aClosed = a.status === 'active' ? 1 : 0;
+            const bClosed = b.status === 'active' ? 1 : 0;
+            if (aClosed !== bClosed) {
+                return aClosed - bClosed;
+            }
+        }
+
+        return new Date(b.start_time) - new Date(a.start_time);
+    });
+
+    return filtered;
 }
 
 
@@ -763,6 +784,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('bookingSearch');
     const activityFilter = document.getElementById('activityFilter');
     const statusFilter = document.getElementById('statusFilter');
+    const actionSort = document.getElementById('actionSort');
     const openWebAppBtn = document.getElementById('openWebAppBtn');
 
     if (openWebAppBtn) {
@@ -789,6 +811,11 @@ document.addEventListener('DOMContentLoaded', () => {
             activityFilter.value = 'all';
             selectedActivity = 'all';
         }
+        renderCalendar();
+    });
+
+    actionSort.addEventListener('change', (event) => {
+        selectedSort = event.target.value;
         renderCalendar();
     });
 

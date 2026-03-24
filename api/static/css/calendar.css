@@ -61,7 +61,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 220px;
+  min-width: 180px;
+  flex: 1 1 180px;
 }
 
 .toolbar-field label {
@@ -338,6 +339,11 @@ body {
 
   .toolbar-field {
     min-width: 100%;
+    flex: 1 1 auto;
+  }
+
+  #goToTodayBtn {
+    width: 100%;
   }
 
   .calendar-day {
