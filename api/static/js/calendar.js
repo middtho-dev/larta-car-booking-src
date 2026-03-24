@@ -3,6 +3,7 @@ let bookings = [];
 let availableCars = [];
 let searchQuery = '';
 let selectedStatus = 'all';
+let selectedActivity = 'all';
 
 const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const months = [
@@ -28,6 +29,15 @@ function escapeHtml(value) {
 function getFilteredBookings() {
     const normalized = searchQuery.trim().toLowerCase();
     return bookings.filter((booking) => {
+        const isOpenAction = booking.status === 'active';
+        const activityMatch = selectedActivity === 'all'
+            || (selectedActivity === 'open' && isOpenAction)
+            || (selectedActivity === 'closed' && !isOpenAction);
+
+        if (!activityMatch) {
+            return false;
+        }
+
         const statusMatch = selectedStatus === 'all' || booking.status === selectedStatus;
         if (!statusMatch) {
             return false;
@@ -751,6 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAdminRights();
 
     const searchInput = document.getElementById('bookingSearch');
+    const activityFilter = document.getElementById('activityFilter');
     const statusFilter = document.getElementById('statusFilter');
     const openWebAppBtn = document.getElementById('openWebAppBtn');
 
@@ -763,8 +774,21 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCalendar();
     });
 
+    activityFilter.addEventListener('change', (event) => {
+        selectedActivity = event.target.value;
+        if (selectedActivity !== 'all') {
+            statusFilter.value = 'all';
+            selectedStatus = 'all';
+        }
+        renderCalendar();
+    });
+
     statusFilter.addEventListener('change', (event) => {
         selectedStatus = event.target.value;
+        if (selectedStatus !== 'all') {
+            activityFilter.value = 'all';
+            selectedActivity = 'all';
+        }
         renderCalendar();
     });
 
